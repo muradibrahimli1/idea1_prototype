@@ -1,0 +1,12 @@
+# Supabase project config.
+# The GitHub integration applies files in supabase/migrations/ to your database
+# on push to the production branch. Local CLI use is optional.
+
+[db]
+# Postgres major version of your Supabase project.
+major_version = 15
+
+[auth]
+# Prototype: allow signup to create a session immediately (no email confirmation).
+# Mirror this in the dashboard: Authentication -> Providers -> Email -> Confirm email = OFF.
+enable_confirmations = false
