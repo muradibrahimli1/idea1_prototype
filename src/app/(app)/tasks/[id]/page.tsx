@@ -111,20 +111,25 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
         <div className="card mt-4">
           <h2 className="mb-1 text-lg font-semibold">Submit your solution</h2>
           <p className="mb-4 text-sm text-gray-500">
-            Upload a PDF, ZIP, or any file with your work. The creator reviews it
-            and scores it.
+            Upload up to 5 files (PDF or ZIP only) with your work. The creator
+            reviews them and scores your submission.
           </p>
           <form action={submitSolution} className="space-y-4">
             <input type="hidden" name="task_id" value={t.id} />
             <div>
-              <label className="label">Solution file *</label>
+              <label className="label">Solution files * (PDF or ZIP, max 5)</label>
               <input
                 type="file"
-                name="file"
+                name="files"
                 required
-                accept=".pdf,.zip,.rar,.7z,.tar,.gz,.doc,.docx,.txt,.md,.png,.jpg"
+                multiple
+                accept=".pdf,.zip,application/pdf,application/zip,application/x-zip-compressed"
                 className="input file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-400"
               />
+              <p className="mt-1 text-xs text-gray-400">
+                Hold ⌘/Ctrl to select several files. Anything beyond 5 files or
+                non-PDF/ZIP will be rejected.
+              </p>
             </div>
             <div>
               <label className="label">Notes for the reviewer</label>
@@ -148,8 +153,14 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
               <ul className="space-y-3">
                 {submissions.map((s) => (
                   <li key={s.id} className="rounded-lg border border-gray-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{s.file_name}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium">
+                        {s.file_names.length} file
+                        {s.file_names.length === 1 ? "" : "s"}:{" "}
+                        <span className="font-normal text-gray-500">
+                          {s.file_names.join(", ")}
+                        </span>
+                      </span>
                       <StatusBadge value={s.status} />
                     </div>
                     {s.reviewed_at ? (

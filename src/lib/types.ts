@@ -33,12 +33,14 @@ export type Purchase = {
 
 export type SubmissionStatus = "pending" | "approved" | "rejected";
 
+export const MAX_SUBMISSION_FILES = 5;
+
 export type Submission = {
   id: string;
   task_id: string;
   solver_id: string;
-  file_path: string;
-  file_name: string;
+  file_paths: string[];
+  file_names: string[];
   notes: string;
   status: SubmissionStatus;
   score: number | null;

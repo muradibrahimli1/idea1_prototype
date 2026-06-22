@@ -65,32 +65,49 @@ export async function buyTask(formData: FormData) {
   redirect(`/tasks/${taskId}`);
 }
 
-// --- Solver: submit a solution file -----------------------------------------
+// --- Solver: submit a solution (1..MAX_SUBMISSION_FILES PDF/ZIP files) -------
+const MAX_FILES = 5;
+const ALLOWED_EXT = /\.(pdf|zip)$/i;
+
 export async function submitSolution(formData: FormData) {
   const { supabase, userId } = await requireUserId();
   const taskId = String(formData.get("task_id") ?? "");
   const notes = String(formData.get("notes") ?? "");
-  const file = formData.get("file") as File | null;
+  const files = formData
+    .getAll("files")
+    .filter((f): f is File => f instanceof File && f.size > 0);
 
-  if (!taskId || !file || file.size === 0) {
-    throw new Error("A file is required to submit.");
+  if (!taskId) throw new Error("Missing task.");
+  if (files.length === 0) throw new Error("Attach at least one file.");
+  if (files.length > MAX_FILES) {
+    throw new Error(`You can upload at most ${MAX_FILES} files.`);
+  }
+  for (const f of files) {
+    if (!ALLOWED_EXT.test(f.name)) {
+      throw new Error(`Only PDF or ZIP files are allowed (got "${f.name}").`);
+    }
   }
 
-  // Path must start with the user's id so storage RLS allows the upload.
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const path = `${userId}/${taskId}/${Date.now()}-${safeName}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("submissions")
-    .upload(path, file, { upsert: false });
-
-  if (uploadError) throw new Error(uploadError.message);
+  // Upload all files in parallel. Paths must start with the user's id so the
+  // storage RLS upload policy allows them. The index keeps names unique.
+  const stamp = Date.now();
+  const uploaded = await Promise.all(
+    files.map(async (f, i) => {
+      const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${userId}/${taskId}/${stamp}-${i}-${safeName}`;
+      const { error } = await supabase.storage
+        .from("submissions")
+        .upload(path, f, { upsert: false });
+      if (error) throw new Error(error.message);
+      return { path, name: f.name };
+    }),
+  );
 
   const { error: insertError } = await supabase.from("submissions").insert({
     task_id: taskId,
     solver_id: userId,
-    file_path: path,
-    file_name: file.name,
+    file_paths: uploaded.map((u) => u.path),
+    file_names: uploaded.map((u) => u.name),
     notes,
   });
 

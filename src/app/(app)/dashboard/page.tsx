@@ -38,7 +38,8 @@ export default async function DashboardPage() {
   const taskIds = createdTasks.map((t) => t.id);
 
   let incoming: SubWithSolver[] = [];
-  const signedUrls: Record<string, string> = {};
+  // submission id -> one signed download link per file
+  const signedUrls: Record<string, { name: string; url: string }[]> = {};
 
   if (taskIds.length > 0) {
     const { data: subs } = await supabase
@@ -49,13 +50,21 @@ export default async function DashboardPage() {
 
     incoming = (subs ?? []) as SubWithSolver[];
 
-    // Pre-sign download links for each submission file.
+    // Pre-sign a download link for every file in every submission.
     await Promise.all(
       incoming.map(async (s) => {
+        if (!s.file_paths?.length) return;
         const { data } = await supabase.storage
           .from("submissions")
-          .createSignedUrl(s.file_path, 60 * 60);
-        if (data?.signedUrl) signedUrls[s.id] = data.signedUrl;
+          .createSignedUrls(s.file_paths, 60 * 60);
+        if (data) {
+          signedUrls[s.id] = data
+            .map((d, i) => ({
+              name: s.file_names[i] ?? `file ${i + 1}`,
+              url: d.signedUrl ?? "",
+            }))
+            .filter((f) => f.url);
+        }
       }),
     );
   }
@@ -131,26 +140,32 @@ export default async function DashboardPage() {
                           key={s.id}
                           className="rounded-lg border border-gray-200 bg-gray-50 p-3"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm">
-                              <span className="font-medium">
-                                {s.solver?.full_name || "Solver"}
-                              </span>{" "}
-                              ·{" "}
-                              {signedUrls[s.id] ? (
-                                <a
-                                  href={signedUrls[s.id]}
-                                  className="text-brand-400 underline"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  {s.file_name}
-                                </a>
-                              ) : (
-                                <span>{s.file_name}</span>
-                              )}
-                            </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-medium">
+                              {s.solver?.full_name || "Solver"}
+                            </span>
                             <StatusBadge value={s.status} />
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                            {(signedUrls[s.id] ??
+                              s.file_names.map((n) => ({ name: n, url: "" }))
+                            ).map((f, i) => (
+                              <span key={i} className="inline-flex items-center gap-1">
+                                <span className="text-gray-400">📎</span>
+                                {f.url ? (
+                                  <a
+                                    href={f.url}
+                                    className="text-brand-400 underline"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {f.name}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-500">{f.name}</span>
+                                )}
+                              </span>
+                            ))}
                           </div>
                           {s.notes && (
                             <p className="mt-1 whitespace-pre-wrap text-xs text-gray-500">

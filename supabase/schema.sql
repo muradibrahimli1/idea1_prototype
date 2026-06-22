@@ -53,8 +53,8 @@ create table if not exists public.submissions (
   id            uuid primary key default gen_random_uuid(),
   task_id       uuid not null references public.tasks (id) on delete cascade,
   solver_id     uuid not null references public.profiles (id) on delete cascade,
-  file_path     text not null,                 -- path in the 'submissions' storage bucket
-  file_name     text not null,
+  file_paths    text[] not null default '{}',  -- paths in the 'submissions' storage bucket (1..5)
+  file_names    text[] not null default '{}',  -- original file names, aligned with file_paths
   notes         text not null default '',      -- solver's explanation
   status        text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   score         integer,                       -- 0..100, set by creator on review
@@ -193,10 +193,11 @@ create policy "submissions read for task creator"
   on storage.objects for select to authenticated
   using (
     bucket_id = 'submissions'
-    and name in (
-      select s.file_path
+    and exists (
+      select 1
       from public.submissions s
       join public.tasks t on t.id = s.task_id
       where t.creator_id = auth.uid()
+        and storage.objects.name = any (s.file_paths)
     )
   );
