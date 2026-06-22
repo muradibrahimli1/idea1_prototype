@@ -14,14 +14,27 @@ export default async function DashboardPage() {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  // ---- Creator side: my tasks + submissions to review ----------------------
-  const { data: myTasks } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("creator_id", profile.id)
-    .order("created_at", { ascending: false });
+  // These three are independent — fire them together to cut round-trip latency.
+  const [myTasksRes, purchasesRes, mySubsRes] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("*")
+      .eq("creator_id", profile.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("purchases")
+      .select("task:tasks(*)")
+      .eq("solver_id", profile.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("submissions")
+      .select("*, task:tasks(id, title)")
+      .eq("solver_id", profile.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
-  const createdTasks = (myTasks ?? []) as Task[];
+  // ---- Creator side: my tasks + submissions to review ----------------------
+  const createdTasks = (myTasksRes.data ?? []) as Task[];
   const taskIds = createdTasks.map((t) => t.id);
 
   let incoming: SubWithSolver[] = [];
@@ -47,27 +60,14 @@ export default async function DashboardPage() {
     );
   }
 
-  const taskTitle = (id: string) =>
-    createdTasks.find((t) => t.id === id)?.title ?? "Task";
-
   // ---- Solver side: my purchases + my submissions --------------------------
-  const { data: purchases } = await supabase
-    .from("purchases")
-    .select("task:tasks(*)")
-    .eq("solver_id", profile.id)
-    .order("created_at", { ascending: false });
-
-  const purchasedTasks = ((purchases ?? []) as { task: Task | Task[] | null }[])
+  const purchasedTasks = ((purchasesRes.data ?? []) as {
+    task: Task | Task[] | null;
+  }[])
     .map((p) => (Array.isArray(p.task) ? p.task[0] : p.task))
     .filter(Boolean) as Task[];
 
-  const { data: mySubsData } = await supabase
-    .from("submissions")
-    .select("*, task:tasks(id, title)")
-    .eq("solver_id", profile.id)
-    .order("created_at", { ascending: false });
-
-  const mySubs = (mySubsData ?? []) as SubWithTask[];
+  const mySubs = (mySubsRes.data ?? []) as SubWithTask[];
 
   const pendingReviews = incoming.filter((s) => !s.reviewed_at).length;
 

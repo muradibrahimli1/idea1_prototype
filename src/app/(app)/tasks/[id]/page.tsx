@@ -12,34 +12,29 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
   const profile = await requireProfile();
   const supabase = createClient();
 
-  const { data: task } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("id", params.id)
-    .single();
+  // All three key off the task id directly — run them together.
+  const [taskRes, purchaseRes, mySubsRes] = await Promise.all([
+    supabase.from("tasks").select("*").eq("id", params.id).single(),
+    supabase
+      .from("purchases")
+      .select("id")
+      .eq("task_id", params.id)
+      .eq("solver_id", profile.id)
+      .maybeSingle(),
+    supabase
+      .from("submissions")
+      .select("*")
+      .eq("task_id", params.id)
+      .eq("solver_id", profile.id)
+      .order("created_at", { ascending: false }),
+  ]);
 
-  if (!task) notFound();
-  const t = task as Task;
+  if (!taskRes.data) notFound();
+  const t = taskRes.data as Task;
 
   const isCreator = t.creator_id === profile.id;
-
-  const { data: purchase } = await supabase
-    .from("purchases")
-    .select("id")
-    .eq("task_id", t.id)
-    .eq("solver_id", profile.id)
-    .maybeSingle();
-
-  const hasAccess = isCreator || !!purchase;
-
-  const { data: mySubs } = await supabase
-    .from("submissions")
-    .select("*")
-    .eq("task_id", t.id)
-    .eq("solver_id", profile.id)
-    .order("created_at", { ascending: false });
-
-  const submissions = (mySubs ?? []) as Submission[];
+  const hasAccess = isCreator || !!purchaseRes.data;
+  const submissions = (mySubsRes.data ?? []) as Submission[];
 
   return (
     <div className="mx-auto max-w-3xl">
