@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
 import ReviewForm from "@/components/ReviewForm";
+import DeleteTaskButton from "@/components/DeleteTaskButton";
 import { StatusBadge, Price } from "@/components/badges";
 import type { Submission, Task, Profile } from "@/lib/types";
 
@@ -121,16 +122,19 @@ export default async function DashboardPage() {
               const subs = incoming.filter((s) => s.task_id === task.id);
               return (
                 <div key={task.id} className="card">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <Link
                       href={`/tasks/${task.id}`}
                       className="font-semibold hover:text-brand-400"
                     >
                       {task.title}
                     </Link>
-                    <span className="text-xs text-gray-400">
-                      {subs.length} submission{subs.length === 1 ? "" : "s"}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-400">
+                        {subs.length} submission{subs.length === 1 ? "" : "s"}
+                      </span>
+                      <DeleteTaskButton taskId={task.id} label="Delete" />
+                    </div>
                   </div>
 
                   {subs.length > 0 && (

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireProfile } from "@/lib/auth";
-import { buyTask, submitSolution } from "@/app/actions";
+import { buyTask } from "@/app/actions";
+import SubmitForm from "@/components/SubmitForm";
+import DeleteTaskButton from "@/components/DeleteTaskButton";
 import { DifficultyBadge, Price, StatusBadge } from "@/components/badges";
 import type { Submission, Task } from "@/lib/types";
 
@@ -97,12 +99,15 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
       )}
 
       {isCreator && (
-        <div className="mt-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-500">
-          You created this task. Review incoming submissions from your{" "}
-          <Link href="/dashboard" className="font-semibold underline">
-            dashboard
-          </Link>
-          .
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-500">
+          <span>
+            You created this task. Review incoming submissions from your{" "}
+            <Link href="/dashboard" className="font-semibold underline">
+              dashboard
+            </Link>
+            .
+          </span>
+          <DeleteTaskButton taskId={t.id} />
         </div>
       )}
 
@@ -114,36 +119,7 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
             Upload up to 5 files (PDF or ZIP only) with your work. The creator
             reviews them and scores your submission.
           </p>
-          <form action={submitSolution} className="space-y-4">
-            <input type="hidden" name="task_id" value={t.id} />
-            <div>
-              <label className="label">Solution files * (PDF or ZIP, max 5)</label>
-              <input
-                type="file"
-                name="files"
-                required
-                multiple
-                accept=".pdf,.zip,application/pdf,application/zip,application/x-zip-compressed"
-                className="input file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-400"
-              />
-              <p className="mt-1 text-xs text-gray-400">
-                Hold ⌘/Ctrl to select several files. Anything beyond 5 files or
-                non-PDF/ZIP will be rejected.
-              </p>
-            </div>
-            <div>
-              <label className="label">Notes for the reviewer</label>
-              <textarea
-                name="notes"
-                rows={3}
-                className="input"
-                placeholder="Architecture decisions, trade-offs, how to run it…"
-              />
-            </div>
-            <button type="submit" className="btn-primary">
-              Submit for review
-            </button>
-          </form>
+          <SubmitForm taskId={t.id} />
 
           {submissions.length > 0 && (
             <div className="mt-6 border-t border-gray-100 pt-4">

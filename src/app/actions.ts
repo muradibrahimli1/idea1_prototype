@@ -45,6 +45,40 @@ export async function createTask(formData: FormData) {
   redirect(`/tasks/${data.id}`);
 }
 
+// --- Creator: delete a task -------------------------------------------------
+export async function deleteTask(formData: FormData) {
+  const { supabase, userId } = await requireUserId();
+  const taskId = String(formData.get("task_id") ?? "");
+  if (!taskId) return;
+
+  // Best-effort: remove any uploaded submission files from storage first.
+  // (RLS / cascade handles the DB rows; orphaned files are harmless if this is
+  // denied, so we don't block deletion on it.)
+  const { data: subs } = await supabase
+    .from("submissions")
+    .select("file_paths")
+    .eq("task_id", taskId);
+  const paths = (subs ?? []).flatMap(
+    (s: { file_paths: string[] | null }) => s.file_paths ?? [],
+  );
+  if (paths.length > 0) {
+    await supabase.storage.from("submissions").remove(paths);
+  }
+
+  // RLS ("tasks delete own") also enforces ownership; the filter is explicit.
+  const { error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", taskId)
+    .eq("creator_id", userId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/marketplace");
+  redirect("/dashboard");
+}
+
 // --- Solver: mock "buy" a task ----------------------------------------------
 export async function buyTask(formData: FormData) {
   const { supabase, userId } = await requireUserId();
