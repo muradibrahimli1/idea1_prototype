@@ -6,6 +6,7 @@ export default function Navbar({ profile }: { profile: Profile }) {
     { href: "/marketplace", label: "Marketplace" },
     { href: "/tasks/create", label: "Create task" },
     { href: "/dashboard", label: "Dashboard" },
+    ...(profile.is_admin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   return (

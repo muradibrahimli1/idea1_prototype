@@ -24,3 +24,13 @@ export async function requireProfile(): Promise<Profile> {
 
   return profile as Profile;
 }
+
+/**
+ * Like requireProfile, but only allows admins through.
+ * Non-admins are bounced to their normal dashboard.
+ */
+export async function requireAdmin(): Promise<Profile> {
+  const profile = await requireProfile();
+  if (!profile.is_admin) redirect("/dashboard");
+  return profile;
+}

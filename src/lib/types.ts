@@ -5,6 +5,7 @@ export type Profile = {
   email: string | null;
   full_name: string | null;
   user_type: UserType;
+  is_admin: boolean;
   created_at: string;
 };
 

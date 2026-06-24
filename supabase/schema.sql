@@ -13,8 +13,20 @@ create table if not exists public.profiles (
   email       text,
   full_name   text,
   user_type   text not null default 'solver' check (user_type in ('creator', 'solver')),
+  is_admin    boolean not null default false,
   created_at  timestamptz not null default now()
 );
+
+-- SECURITY DEFINER so it reads profiles without tripping RLS (no recursion).
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+$$;
 
 -- ---------------------------------------------------------------------------
 -- TASKS — published by creators into the marketplace.
@@ -142,6 +154,10 @@ drop policy if exists "purchases insert own" on public.purchases;
 create policy "purchases insert own"
   on public.purchases for insert to authenticated with check (auth.uid() = solver_id);
 
+drop policy if exists "purchases readable by admin" on public.purchases;
+create policy "purchases readable by admin"
+  on public.purchases for select to authenticated using (public.is_admin());
+
 -- SUBMISSIONS ----------------------------------------------------------------
 -- Visible to the solver who made it and the creator of the task.
 drop policy if exists "submissions readable by participant" on public.submissions;
@@ -155,6 +171,10 @@ create policy "submissions readable by participant"
 drop policy if exists "submissions insert own" on public.submissions;
 create policy "submissions insert own"
   on public.submissions for insert to authenticated with check (auth.uid() = solver_id);
+
+drop policy if exists "submissions readable by admin" on public.submissions;
+create policy "submissions readable by admin"
+  on public.submissions for select to authenticated using (public.is_admin());
 
 -- Only the task creator can review (update score/feedback/status).
 drop policy if exists "submissions update by task creator" on public.submissions;
@@ -186,6 +206,12 @@ create policy "submissions read own folder"
     bucket_id = 'submissions'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- Admins can read every submission file (for signed download URLs).
+drop policy if exists "submissions read for admin" on storage.objects;
+create policy "submissions read for admin"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'submissions' and public.is_admin());
 
 -- A task creator can read (and sign URLs for) files submitted to their tasks.
 drop policy if exists "submissions read for task creator" on storage.objects;
